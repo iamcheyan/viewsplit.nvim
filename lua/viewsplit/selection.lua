@@ -6,11 +6,24 @@ local function configure_window(ns, win, active)
     vim.api.nvim_win_set_hl_ns(win, 0)
     return
   end
-  local normal = vim.api.nvim_get_hl(0, { name = "Normal", link = false })
   local visual = vim.api.nvim_get_hl(0, { name = "Visual", link = false })
-  vim.api.nvim_set_hl(ns, "Visual", { link = "Normal" })
+  vim.api.nvim_set_hl(ns, "Visual", {})
+  vim.api.nvim_set_hl(ns, "VisualNOS", {})
   vim.api.nvim_set_hl(ns, "ViewSplitSavedSelection", visual)
   vim.api.nvim_win_set_hl_ns(win, ns)
+end
+
+local function end_col_inclusive(buf, row, col)
+  local line = vim.api.nvim_buf_get_lines(buf, row - 1, row, false)[1] or ""
+  if col > #line then
+    return #line
+  end
+  local idx = vim.str_utfindex(line, "utf-32", col)
+  local ok, byte_end = pcall(vim.str_byteindex, line, "utf-32", idx)
+  if ok and byte_end then
+    return byte_end
+  end
+  return math.min(#line, col)
 end
 
 local function capture(win, buf, active_mode)
@@ -36,19 +49,44 @@ local function capture(win, buf, active_mode)
     if not ok or type(segments) ~= "table" or #segments == 0 then
       segments = { { p1, p2 } }
     end
-    return { kind = mode == "V" and "line" or (mode == "\22" and "block" or "char"), segments = segments }
+    return {
+      kind = mode == "V" and "line" or (mode == "\22" and "block" or "char"),
+      mode = mode,
+      bufnr = buf,
+      exclusive = exclusive,
+      anchor = first,
+      cursor = last,
+      segments = segments,
+    }
   end)
 end
 
 local function render(ns, win, buf, selection)
   if not selection or selection.active or vim.api.nvim_win_get_buf(win) ~= buf then return end
+  if selection.bufnr and selection.bufnr ~= buf then return end
+  local is_line = selection.kind == "line"
+  local is_excl = selection.exclusive == true
   for _, segment in ipairs(selection.segments or {}) do
     local first, last = segment[1], segment[2]
     if first and last then
-      vim.api.nvim_buf_set_extmark(buf, ns, first[2] - 1, first[3] - 1, {
-        end_row = last[2] - 1,
-        end_col = last[3] - 1,
+      local start_row = first[2] - 1
+      local start_col = math.max(0, first[3] - 1)
+      local end_row = last[2] - 1
+      local end_col
+      if is_line then
+        local line = vim.api.nvim_buf_get_lines(buf, end_row, end_row + 1, false)[1] or ""
+        start_col = 0
+        end_col = #line
+      elseif is_excl then
+        end_col = math.max(start_col, last[3])
+      else
+        end_col = end_col_inclusive(buf, last[2], last[3])
+      end
+      vim.api.nvim_buf_set_extmark(buf, ns, start_row, start_col, {
+        end_row = end_row,
+        end_col = end_col,
         hl_group = "ViewSplitSavedSelection",
+        hl_eol = is_line,
         priority = 200,
         ephemeral = true,
         strict = false,
@@ -57,16 +95,24 @@ local function render(ns, win, buf, selection)
   end
 end
 
+function M.clear(state)
+  if not state then return end
+  state.selection = nil
+  pcall(vim.cmd.redraw)
+end
+
 function M.setup(states, group)
   local ns = vim.api.nvim_create_namespace("viewsplit-visual")
+  local leaving_visual_win = nil
   vim.api.nvim_set_decoration_provider(ns, {
     on_win = function(_, win, buf)
       local state = states[win]
       if not state or vim.api.nvim_win_get_buf(win) ~= buf then return false end
       local active = win == vim.api.nvim_get_current_win()
       configure_window(ns, win, active)
-      if not active then
-        render(ns, win, buf, state.selection)
+      local sel = state.selection
+      if sel and (not active or not sel.active) then
+        render(ns, win, buf, sel)
       end
       return false
     end,
@@ -75,6 +121,12 @@ function M.setup(states, group)
     group = group,
     callback = function()
       local current = vim.api.nvim_get_current_win()
+      local mode = vim.api.nvim_get_mode().mode
+      if mode:match("^[vV\22]") then
+        leaving_visual_win = current
+        pcall(vim.cmd, "normal! \27")
+        leaving_visual_win = nil
+      end
       for win, state in pairs(states) do
         if win ~= current and state.selection then
           state.selection.active = false
@@ -91,17 +143,13 @@ function M.setup(states, group)
       local state = states[win]
       if not state then return end
       local mode = vim.api.nvim_get_mode().mode
-      if mode:match("^[vV\\22]") then
-        local selection = capture(win, vim.api.nvim_win_get_buf(win), mode)
+      if mode:match("^[vV\22]") then
+        local selection = capture(win, vim.api.nvim_win_get_buf(win), mode:sub(1, 1))
         if selection then
           selection.active = false
           state.selection = selection
         end
-        vim.schedule(function()
-          if vim.api.nvim_get_mode().mode:match("^[vV\\22]") then
-            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
-          end
-        end)
+        leaving_visual_win = win
       end
     end,
   })
@@ -112,15 +160,64 @@ function M.setup(states, group)
       local state = states[win]
       if not state then return end
       local old_mode, new_mode = vim.v.event.old_mode or "", vim.v.event.new_mode or ""
-      if old_mode:match("^[vV\22]") then
+      if old_mode:match("^[vV\22]") and not new_mode:match("^[vV\22]") then
+        if leaving_visual_win ~= nil then
+          leaving_visual_win = nil
+          return
+        end
+        local op = vim.v.operator or ""
+        if op ~= "" then
+          state.selection = nil
+          return
+        end
         local selection = capture(win, vim.api.nvim_get_current_buf())
-        if selection then selection.active = false; state.selection = selection end
+        if selection then
+          selection.active = false
+          state.selection = selection
+        end
       elseif new_mode:match("^[vV\22]") then
+        leaving_visual_win = nil
         local selection = capture(win, vim.api.nvim_get_current_buf(), new_mode:sub(1, 1))
-        if selection then selection.active = true; state.selection = selection end
+        if selection then
+          selection.active = true
+          state.selection = selection
+        end
       end
     end,
   })
+  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+    group = group,
+    callback = function()
+      local win = vim.api.nvim_get_current_win()
+      local state = states[win]
+      if not state or not vim.api.nvim_win_is_valid(win) then return end
+      local mode = vim.api.nvim_get_mode().mode
+      if mode:match("^[vV\22]") then
+        local selection = capture(win, vim.api.nvim_win_get_buf(win), mode:sub(1, 1))
+        if selection then
+          selection.active = true
+          state.selection = selection
+        end
+      end
+    end,
+  })
+  local left_mouse = vim.api.nvim_replace_termcodes("<LeftMouse>", true, false, true)
+  vim.on_key(function(key, typed)
+    local raw = (typed and typed ~= "") and typed or key
+    if raw == left_mouse or key == left_mouse then
+      local ok, mp = pcall(vim.fn.getmousepos)
+      if ok and mp and mp.winid and mp.winid ~= 0 then
+        local cur = vim.api.nvim_get_current_win()
+        if mp.winid == cur then
+          local state = states[cur]
+          if state and state.selection and not state.selection.active then
+            state.selection = nil
+            vim.schedule(function() pcall(vim.cmd.redraw) end)
+          end
+        end
+      end
+    end
+  end, ns)
 end
 
 return M

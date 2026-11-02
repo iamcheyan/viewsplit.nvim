@@ -38,6 +38,46 @@ function M.selection_state(win)
   return state and state.selection or nil
 end
 
+function M.clear_selection(win)
+  local state = M.view(win)
+  if state then
+    Selection.clear(state)
+  end
+end
+
+function M.clear_search(win)
+  local state = M.view(win)
+  if state then
+    Search.clear(state)
+  end
+end
+
+function M.set_search(win, pattern)
+  local state = M.view(win)
+  if state then
+    Search.set(state, pattern)
+  end
+end
+
+function M.get_search(win)
+  local state = M.view(win)
+  return state and state.search_pattern ~= "" and state.search_pattern or nil
+end
+
+function M.restore_search_reg(win)
+  local state = M.view(win)
+  if state then
+    Search.restore(state)
+  end
+end
+
+function M.update_search_prompt(win)
+  local state = M.view(win)
+  if state then
+    Search.update_prompt(state)
+  end
+end
+
 function M.set_mark(name, pos, win)
   return Marks.set(M.view(win), name, pos)
 end
@@ -91,9 +131,7 @@ function M.setup(opts)
   api.nvim_create_autocmd("WinNew", {
     group = group,
     callback = function()
-      vim.schedule(function()
-        for _, win in ipairs(api.nvim_list_wins()) do ensure(win) end
-      end)
+      for _, win in ipairs(api.nvim_list_wins()) do ensure(win) end
     end,
   })
   api.nvim_create_autocmd("WinClosed", {

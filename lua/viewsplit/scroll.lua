@@ -16,11 +16,15 @@ function M.capture(state)
 end
 
 function M.restore(state)
-  if not api.nvim_win_is_valid(state.winid) then return end
+  if not state or not api.nvim_win_is_valid(state.winid) then return end
+  if type(state.cursor) ~= "table" or #state.cursor < 2 then
+    capture(state)
+    return
+  end
   api.nvim_win_call(state.winid, function()
     vim.fn.winrestview({
-      lnum = state.cursor and state.cursor[1] or 1,
-      col = state.cursor and state.cursor[2] or 0,
+      lnum = state.cursor[1],
+      col = state.cursor[2],
       topline = state.topline or 1,
       leftcol = state.leftcol or 0,
       skipcol = state.skipcol or 0,

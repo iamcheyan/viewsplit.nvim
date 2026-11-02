@@ -6,13 +6,13 @@ local function valid_win(win)
 end
 
 function M.new(win)
-  return {
+  local state = {
     winid = win,
     search_pattern = "",
     search_match_id = nil,
     folds = {},
-    cursor = {},
-    topline = 1,
+    cursor = nil,
+    topline = nil,
     leftcol = 0,
     skipcol = 0,
     curswant = 0,
@@ -20,6 +20,10 @@ function M.new(win)
     jumplist = {},
     selection = nil,
   }
+  if valid_win(win) then
+    M.capture(state)
+  end
+  return state
 end
 
 function M.capture(state)
@@ -35,11 +39,15 @@ end
 
 function M.restore(state)
   if not state or not valid_win(state.winid) then return end
+  if type(state.cursor) ~= "table" or #state.cursor < 2 then
+    M.capture(state)
+    return
+  end
   local win = state.winid
   api.nvim_win_call(win, function()
     vim.fn.winrestview({
-      lnum = state.cursor and state.cursor[1] or 1,
-      col = state.cursor and state.cursor[2] or 0,
+      lnum = state.cursor[1],
+      col = state.cursor[2],
       topline = state.topline or 1,
       leftcol = state.leftcol or 0,
       skipcol = state.skipcol or 0,

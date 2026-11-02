@@ -41,4 +41,38 @@ assert(sa.segments[1][2][3] ~= sb.segments[1][2][3], "the two view selections sh
 assert(viewsplit.selection_state(a).segments[1][2][3] == sa.segments[1][2][3], "view A state must survive selecting in B")
 assert(vim.api.nvim_buf_get_lines(buf, 0, -1, true)[1] == "one two three four", "selection capture must not edit text")
 
+-- Regression: switching windows while Visual mode is active must capture the
+-- leaving window's exact range, exit Visual mode in the target window, and
+-- never overwrite the leaving window's selection when selecting in the target.
+vim.api.nvim_set_current_win(a)
+vim.api.nvim_win_set_cursor(a, { 1, 0 })
+vim.api.nvim_feedkeys("vll", "xt", false) -- select "one" (bytes 1..3)
+vim.api.nvim_set_current_win(b)
+assert(vim.api.nvim_get_mode().mode == "n", "entering target split must exit Visual mode")
+local sa_switch = viewsplit.selection_state(a)
+assert(sa_switch and not sa_switch.active and sa_switch.segments[1][1][3] == 1 and sa_switch.segments[1][2][3] == 3,
+  "leaving view A in Visual mode must save its exact range (1..3)")
+
+vim.api.nvim_win_set_cursor(b, { 1, 4 })
+vim.api.nvim_feedkeys("vll", "xt", false) -- select "two" (bytes 5..7)
+vim.api.nvim_set_current_win(a)
+assert(vim.api.nvim_get_mode().mode == "n", "switching back to view A must exit Visual mode")
+local sa_back = viewsplit.selection_state(a)
+local sb_back = viewsplit.selection_state(b)
+assert(sa_back and sa_back.segments[1][1][3] == 1 and sa_back.segments[1][2][3] == 3,
+  "view A saved selection must not be overwritten when switching back from B")
+assert(sb_back and sb_back.segments[1][1][3] == 5 and sb_back.segments[1][2][3] == 7,
+  "view B saved selection must be preserved (5..7)")
+
+-- Regression: clear_selection clears only the specified window's selection.
+viewsplit.clear_selection(a)
+assert(viewsplit.selection_state(a) == nil, "clear_selection(a) must clear view A selection")
+assert(viewsplit.selection_state(b) ~= nil, "clear_selection(a) must preserve view B selection")
+
+-- Regression: operator in Visual mode (e.g. yank `y`) clears the selection instead of leaving a stale overlay.
+vim.api.nvim_set_current_win(b)
+vim.api.nvim_win_set_cursor(b, { 1, 0 })
+vim.api.nvim_feedkeys("vlly", "xt", false)
+assert(viewsplit.selection_state(b) == nil, "yanking a Visual selection must clear the saved selection")
+
 print("selection_spec: OK")

@@ -56,6 +56,9 @@ Set `selection = true` to save Visual ranges per window and draw inactive siblin
 - `view(winid)` — return state for a window.
 - `current_view_id()` — return the focused window ID.
 - `selection_state(winid)` — return the saved selection, if enabled and captured.
+- `clear_selection(winid)` — clear the saved selection for a window.
+- `set_search(winid, pattern)` / `get_search(winid)` / `clear_search(winid)` — set, query, or clear a window's search match and `vim.w[winid].win_search_pattern`.
+- `restore_search_reg(winid)` / `update_search_prompt(winid)` — restore `@/` for a window and update its search count echo.
 - `set_mark(name, {row, col}, winid)` / `get_mark(name, winid)` / `del_mark(name, winid)` — independent lowercase view marks.
 - `jump_back(winid)` / `jump_forward(winid)` — traverse recorded per-view cursor locations.
 - `:ViewInfo` — show the focused view's state.

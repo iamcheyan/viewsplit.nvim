@@ -38,6 +38,7 @@ function M.restore(state)
   end
   if not state.fold_ranges then return end
   api.nvim_win_call(state.winid, function()
+    local saved_view = vim.fn.winsaveview()
     vim.cmd("silent! normal! zR")
     for _, range in ipairs(state.fold_ranges) do
       local line = range.first
@@ -46,6 +47,7 @@ function M.restore(state)
         vim.cmd("silent! normal! zc")
       end
     end
+    vim.fn.winrestview(saved_view)
   end)
 end
 

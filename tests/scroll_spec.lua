@@ -41,4 +41,15 @@ View.restore(sb)
 assert(api.nvim_win_get_cursor(b)[1] == 12, "view B cursor should restore")
 assert(vim.fn.line("w0") == sb.topline, "view B top line should restore")
 
+-- Regression: creating a new split with setup() active must preserve the new split's initial cursor position
+-- instead of resetting it to {1, 0} on first WinEnter.
+local viewsplit = require("viewsplit")
+viewsplit.setup({ scroll = true })
+api.nvim_set_current_win(a)
+api.nvim_win_set_cursor(a, { 35, 2 })
+vim.cmd("vsplit")
+local c = api.nvim_get_current_win()
+assert(api.nvim_win_get_cursor(c)[1] == 35 and api.nvim_win_get_cursor(c)[2] == 2,
+  "newly vsplit window must inherit and keep parent cursor position")
+
 print("scroll_spec: OK")

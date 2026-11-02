@@ -20,6 +20,10 @@ API                                                       *viewsplit-api*
 `require("viewsplit").view(winid)` returns state for a window ID.
 `require("viewsplit").current_view_id()` returns the focused window ID.
 `require("viewsplit").selection_state(winid)` returns saved selection state.
+`require("viewsplit").clear_selection(winid)` clears saved selection state.
+`set_search(winid, pattern)`, `get_search(winid)`, `clear_search(winid)`,
+`restore_search_reg(winid)`, and `update_search_prompt(winid)` manage per-window
+search state and statusline/scrollbar integration (`vim.w[winid].win_search_pattern`).
 
 `set_mark(name, {row, col}, winid)`, `get_mark(name, winid)`, and
 `del_mark(name, winid)` manage independent lowercase named view marks.

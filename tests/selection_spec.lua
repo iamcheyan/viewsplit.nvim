@@ -4,28 +4,30 @@ local viewsplit = require("viewsplit")
 viewsplit.setup({ selection = true })
 
 local buf = vim.api.nvim_create_buf(true, false)
-vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "one two three four" })
+vim.api.nvim_buf_set_lines(buf, 0, -1, false, {
+  "one two three four",
+  "multibyte: あいうえお",
+})
 local a = vim.api.nvim_get_current_win()
 vim.api.nvim_win_set_buf(a, buf)
 vim.cmd("vsplit")
 local b = vim.api.nvim_get_current_win()
 
-local function select_in_window(win, keys)
+local function leave_selection(win, keys)
   vim.api.nvim_set_current_win(win)
   vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(keys, true, false, true), "xt", false)
-  vim.wait(30)
+  vim.wait(20)
 end
 
-select_in_window(a, "vll<Esc>")
+leave_selection(a, "vll<Esc>")
 local sa = viewsplit.selection_state(a)
-assert(sa and sa.first and sa.last,
-  "view A should retain its selection as view state")
+assert(sa and sa.first and sa.last and sa.kind == "char", "view A should retain a characterwise selection")
 
-select_in_window(b, "vllll<Esc>")
+leave_selection(b, "vllll<Esc>")
 local sb = viewsplit.selection_state(b)
-assert(sb and sb.first and sb.last,
-  "view B should retain its selection as view state")
-assert(sa.first[2] ~= sb.first[2] or sa.last[2] ~= sb.last[2], "the selections should differ")
-assert(viewsplit.selection_state(a).last[2] == sa.last[2], "switching to B must not overwrite A selection")
+assert(sb and sb.first and sb.last and sb.kind == "char", "view B should retain its characterwise selection")
+assert(sa.last[2] ~= sb.last[2], "the two view selections should differ")
+assert(viewsplit.selection_state(a).last[2] == sa.last[2], "view A state must survive selecting in B")
+assert(vim.api.nvim_buf_get_lines(buf, 0, -1, true)[1] == "one two three four", "selection capture must not edit text")
 
 print("selection_spec: OK")

@@ -38,13 +38,7 @@ The search layer uses `matchadd(..., { window = win })`. It does not take over m
 
 ### Selection state (experimental)
 
-Set `selection = true` to retain Visual selection coordinates per view. Neovim's native Visual mode remains active only in the focused window. The plugin uses an ephemeral decoration provider to render stored selections for inactive windows that show the same buffer.
-
-```lua
-require("viewsplit").setup({ selection = true })
-```
-
-This initial implementation supports characterwise selections. Linewise/blockwise fidelity, edits that transform a stored selection, and interactions with other decoration providers need further validation.
+Set `selection = true` to retain characterwise Visual selection coordinates per view and render saved selections for inactive sibling windows through Neovim 0.12's per-window ephemeral decoration provider. Neovim still has only one active native Visual selection; the plugin draws saved selections as overlays. Linewise/blockwise fidelity, exclusive-selection semantics and tracking a range through edits need further validation.
 
 ## API
 

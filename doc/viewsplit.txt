@@ -27,9 +27,10 @@ continue that view's search. Global `hlsearch` is disabled by this layer.
 SELECTION                                           *viewsplit-selection*
 
 When `selection = true`, characterwise Visual ranges are stored by window and
-inactive views are rendered through an ephemeral decoration provider. Native
-Visual mode remains active only in the focused window. Linewise and blockwise
-selection fidelity is not yet implemented.
+inactive sibling views render them through Neovim 0.12's per-window ephemeral
+decoration provider. Native Visual mode remains active only in the focused
+window. Linewise/blockwise, exclusive selection, and edit tracking are not yet
+verified.
 
 LIMITATIONS                                           *viewsplit-limitations*
 

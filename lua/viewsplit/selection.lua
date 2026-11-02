@@ -1,16 +1,41 @@
 local M = {}
 
-local function configure_window(ns, win, active)
+local function ensure_selection_hl()
+  local visual = vim.api.nvim_get_hl(0, { name = "Visual", link = false })
+  vim.api.nvim_set_hl(0, "ViewSplitSavedSelection", visual)
+  vim.api.nvim_set_hl(0, "ViewSplitVisualHidden", {})
+end
+
+local function configure_window(win, active)
   if not vim.api.nvim_win_is_valid(win) then return end
+  local cur = vim.wo[win].winhighlight or ""
   if active then
-    vim.api.nvim_win_set_hl_ns(win, 0)
+    if vim.w[win]._viewsplit_saved_visual_hl then
+      cur = cur:gsub("Visual:ViewSplitVisualHidden", "Visual:" .. vim.w[win]._viewsplit_saved_visual_hl)
+      vim.w[win]._viewsplit_saved_visual_hl = nil
+    else
+      cur = cur:gsub(",?Visual:ViewSplitVisualHidden", "")
+    end
+    cur = cur:gsub(",?VisualNOS:ViewSplitVisualHidden", ""):gsub("^,", "")
+    if cur ~= vim.wo[win].winhighlight then
+      vim.wo[win].winhighlight = cur
+    end
     return
   end
-  local visual = vim.api.nvim_get_hl(0, { name = "Visual", link = false })
-  vim.api.nvim_set_hl(ns, "Visual", {})
-  vim.api.nvim_set_hl(ns, "VisualNOS", {})
-  vim.api.nvim_set_hl(ns, "ViewSplitSavedSelection", visual)
-  vim.api.nvim_win_set_hl_ns(win, ns)
+  if cur:find("Visual:ViewSplitVisualHidden", 1, true) then
+    return
+  end
+  local existing_visual = cur:match("Visual:([^,]+)")
+  if existing_visual and existing_visual ~= "ViewSplitVisualHidden" then
+    vim.w[win]._viewsplit_saved_visual_hl = existing_visual
+    cur = cur:gsub("Visual:[^,]+", "Visual:ViewSplitVisualHidden")
+  else
+    cur = (cur ~= "" and (cur .. ",") or "") .. "Visual:ViewSplitVisualHidden"
+  end
+  if not cur:find("VisualNOS:", 1, true) then
+    cur = cur .. ",VisualNOS:ViewSplitVisualHidden"
+  end
+  vim.wo[win].winhighlight = cur
 end
 
 local function end_col_inclusive(buf, row, col)
@@ -102,14 +127,19 @@ function M.clear(state)
 end
 
 function M.setup(states, group)
+  ensure_selection_hl()
   local ns = vim.api.nvim_create_namespace("viewsplit-visual")
   local leaving_visual_win = nil
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    group = group,
+    callback = ensure_selection_hl,
+  })
   vim.api.nvim_set_decoration_provider(ns, {
     on_win = function(_, win, buf)
       local state = states[win]
       if not state or vim.api.nvim_win_get_buf(win) ~= buf then return false end
       local active = win == vim.api.nvim_get_current_win()
-      configure_window(ns, win, active)
+      configure_window(win, active)
       local sel = state.selection
       if sel and (not active or not sel.active) then
         render(ns, win, buf, sel)
@@ -131,7 +161,7 @@ function M.setup(states, group)
         if win ~= current and state.selection then
           state.selection.active = false
         end
-        configure_window(ns, win, win == current)
+        configure_window(win, win == current)
       end
       vim.cmd.redraw()
     end,

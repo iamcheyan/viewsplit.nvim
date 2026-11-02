@@ -78,6 +78,11 @@ function M.update_search_prompt(win)
   end
 end
 
+function M.lens_info(win)
+  local state = M.view(win)
+  return state and Search.lens_info(state) or nil
+end
+
 function M.set_mark(name, pos, win)
   return Marks.set(M.view(win), name, pos)
 end

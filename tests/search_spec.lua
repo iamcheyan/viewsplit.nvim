@@ -31,6 +31,12 @@ local ma, mb = vim.fn.getmatches(a), vim.fn.getmatches(b)
 assert(#ma == 1 and ma[1].pattern == "config", "view A should retain only its own match")
 assert(#mb == 1 and mb[1].pattern == "nvim", "view B should retain only its own match")
 
+-- Per-split search lens info should reflect each window's independent pattern
+-- and cursor position.
+local la, lb = viewsplit.lens_info(a), viewsplit.lens_info(b)
+assert(la and la.cnt == 2 and la.text:find("/2]", 1, true), "view A should compute lens count for its pattern")
+assert(lb and lb.cnt == 2 and lb.text:find("/2]", 1, true), "view B should compute lens count for its pattern")
+
 -- Regression: a saved session script or plugin setting `set hlsearch` must be
 -- intercepted so switching views and restoring `@/` never globally illuminates
 -- one split's search pattern inside the other split.

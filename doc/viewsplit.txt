@@ -1,0 +1,39 @@
+*viewsplit.nvim* Manage independent view-local state for splits of one buffer.
+
+SETUP                                                   *viewsplit-setup*
+
+    require("viewsplit").setup({ search = true, selection = false })
+
+Calling setup() without options enables the implemented per-window search layer.
+Other options remain opt-in. Supported options are `search` and experimental
+`selection`.
+
+API                                                       *viewsplit-api*
+
+`require("viewsplit").current_view()` returns the current window's state table.
+`require("viewsplit").view(winid)` returns state for a window ID.
+`require("viewsplit").current_view_id()` returns the focused window ID.
+`require("viewsplit").selection_state(winid)` returns saved selection state.
+
+`:ViewInfo` displays the current view state. `:ViewSync` reapplies stored local
+search matches.
+
+SEARCH                                                   *viewsplit-search*
+
+Each window stores its own search pattern and uses a window-local match. On
+window entry the pattern is restored to the `/` register, so native `n` and `N`
+continue that view's search. Global `hlsearch` is disabled by this layer.
+
+SELECTION                                           *viewsplit-selection*
+
+When `selection = true`, characterwise Visual ranges are stored by window and
+inactive views are rendered through an ephemeral decoration provider. Native
+Visual mode remains active only in the focused window. Linewise and blockwise
+selection fidelity is not yet implemented.
+
+LIMITATIONS                                           *viewsplit-limitations*
+
+The full roadmap includes independent fold state, jumplists, marks, cursor
+history, and more complete Visual state. Those stages are not implemented.
+Stored state is in memory and keyed by window ID; it is removed when the window
+closes.

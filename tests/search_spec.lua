@@ -30,4 +30,12 @@ assert(vim.fn.getreg("/") == "nvim", "entering view B should restore its search 
 local ma, mb = vim.fn.getmatches(a), vim.fn.getmatches(b)
 assert(#ma == 1 and ma[1].pattern == "config", "view A should retain only its own match")
 assert(#mb == 1 and mb[1].pattern == "nvim", "view B should retain only its own match")
+
+-- Regression: a saved session script or plugin setting `set hlsearch` must be
+-- intercepted so switching views and restoring `@/` never globally illuminates
+-- one split's search pattern inside the other split.
+vim.cmd("set hlsearch")
+assert(not vim.o.hlsearch, "OptionSet guard must keep global hlsearch disabled")
+vim.api.nvim_set_current_win(a)
+assert(not vim.o.hlsearch, "switching to view A must keep global hlsearch disabled")
 print("search_spec: OK")

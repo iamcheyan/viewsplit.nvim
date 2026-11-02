@@ -54,6 +54,7 @@ end
 
 function M.clear(state)
   if not state then return end
+  vim.opt.hlsearch = false
   local win = state.winid
   if valid(win) then
     if state.search_match_id then
@@ -79,6 +80,7 @@ end
 
 function M.set(state, pattern)
   if not state then return end
+  vim.opt.hlsearch = false
   M.clear(state)
   if not valid(state.winid) or type(pattern) ~= "string" or pattern == "" then return end
   state.search_pattern = pattern
@@ -96,6 +98,7 @@ end
 
 function M.restore(state)
   if not state or not valid(state.winid) then return end
+  vim.opt.hlsearch = false
   M.clean_winhl(state.winid)
   if state.search_pattern ~= "" then
     vim.fn.setreg("/", state.search_pattern)
@@ -120,6 +123,24 @@ function M.setup(states, group)
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     M.clean_winhl(win)
   end
+  vim.api.nvim_create_autocmd("SessionLoadPost", {
+    group = group,
+    callback = function()
+      vim.opt.hlsearch = false
+      for _, win in ipairs(vim.api.nvim_list_wins()) do
+        M.clean_winhl(win)
+      end
+    end,
+  })
+  vim.api.nvim_create_autocmd("OptionSet", {
+    group = group,
+    pattern = "hlsearch",
+    callback = function()
+      if vim.o.hlsearch then
+        vim.opt.hlsearch = false
+      end
+    end,
+  })
   vim.api.nvim_create_autocmd("CmdlineLeave", {
     group = group,
     callback = function()

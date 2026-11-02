@@ -34,7 +34,7 @@ Calling `setup()` with no options enables the implemented per-window search laye
 - Per-view cursor history with `jump_back()` / `jump_forward()` API when `jumps = true`; native `<C-o>` and `<C-i>` mappings remain untouched.
 - Per-view lowercase named marks through `set_mark()`, `get_mark()`, and `del_mark()`; these do not replace Neovim's native marks.
 - Per-window cursor and viewport snapshot (`topline`, `leftcol`, `skipcol`, desired column) restored at window entry when `scroll = true`.
-- Experimental characterwise Visual selection snapshots rendered for inactive sibling views through ephemeral decoration.
+- Experimental Visual selections rendered for inactive sibling views through ephemeral decoration; capture supports characterwise, linewise, blockwise, multibyte, and exclusive ranges. Characterwise inactive overlay rendering was visually verified in the configured TUI.
 
 
 Each view remembers its own `/` or `?` search pattern and window-local match. Entering a view restores its pattern to Neovim's search register so `n` and `N` continue that view's search. Global `hlsearch` stays disabled to avoid painting every split with the same search register.
@@ -47,7 +47,7 @@ The search layer uses `matchadd(..., { window = win })`. It does not take over m
 
 ### Selection state (experimental)
 
-Set `selection = true` to retain characterwise Visual selection coordinates per view and render saved selections for inactive sibling windows through Neovim 0.12's per-window ephemeral decoration provider. Neovim still has only one active native Visual selection; the plugin draws saved selections as overlays. Linewise/blockwise fidelity, exclusive-selection semantics and tracking a range through edits need further validation.
+Set `selection = true` to save Visual ranges per window and draw inactive sibling ranges through Neovim 0.12's per-window ephemeral decoration provider. Neovim still has one native active Visual selection; inactive ranges are overlays. Characterwise, linewise, blockwise, multibyte, and `selection=exclusive` capture pass the region tests. Inactive overlay pixels pass the configured-theme TUI probe for characterwise selections. Range tracking through edits and third-party highlight namespace compatibility remain unverified.
 
 ## API
 

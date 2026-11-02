@@ -20,6 +20,7 @@ local function capture(win, buf, active_mode)
     if active_mode then
       local anchor = vim.fn.getpos("v")
       local cursor = vim.fn.getcurpos()
+      if anchor[2] < 1 or cursor[2] < 1 then return nil end
       first = { anchor[2], anchor[3] - 1 }
       last = { cursor[2], cursor[3] - 1 }
     else
@@ -112,14 +113,11 @@ function M.setup(states, group)
       if not state then return end
       local old_mode, new_mode = vim.v.event.old_mode or "", vim.v.event.new_mode or ""
       if old_mode:match("^[vV\22]") then
-        state.selection = capture(win, vim.api.nvim_win_get_buf(win))
+        local selection = capture(win, vim.api.nvim_get_current_buf())
+        if selection then selection.active = false; state.selection = selection end
       elseif new_mode:match("^[vV\22]") then
-        vim.schedule(function()
-          if vim.api.nvim_win_is_valid(win) and vim.api.nvim_get_current_win() == win then
-            local selection = capture(win, vim.api.nvim_win_get_buf(win))
-            if selection then selection.active = true; state.selection = selection end
-          end
-        end)
+        local selection = capture(win, vim.api.nvim_get_current_buf(), new_mode:sub(1, 1))
+        if selection then selection.active = true; state.selection = selection end
       end
     end,
   })

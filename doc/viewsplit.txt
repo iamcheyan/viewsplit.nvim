@@ -60,12 +60,13 @@ desired cursor column.
 
 SELECTION                                           *viewsplit-selection*
 
-When `selection = true`, Visual ranges are stored by window and inactive sibling
+When `selection = true`, Visual ranges are stored by window. Inactive sibling
 views render saved ranges through Neovim 0.12's per-window ephemeral decoration
-provider. Native Visual mode remains active only in the focused window. The
-implementation derives characterwise, linewise, and blockwise ranges from
-`getregionpos()`, including `selection=exclusive`. Inactive overlay rendering
-and range tracking across edits require UI integration verification.
+provider. Neovim still has one native active Visual selection; inactive ranges
+are overlays. Characterwise, linewise, blockwise, multibyte, and
+`selection=exclusive` capture pass the region tests. Characterwise inactive
+overlay pixels pass the configured-theme TUI probe. Range tracking through
+edits and third-party highlight namespace compatibility remain unverified.
 
 LIMITATIONS                                           *viewsplit-limitations*
 

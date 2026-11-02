@@ -27,6 +27,12 @@ select("vlll<Esc>")
 local char = states[win].selection
 assert(char and char.kind == "char", "characterwise range captured")
 assert(char.segments[1][1][3] == 1 and char.segments[1][2][3] == 6, "multibyte character selection uses byte boundaries")
+vim.api.nvim_set_current_win(win)
+vim.api.nvim_win_set_cursor(win, { 1, 5 })
+vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("vhh<Esc>", true, false, true), "xt", false)
+vim.wait(20)
+local reverse = states[win].selection
+assert(reverse and reverse.segments[1][1][3] == 2 and reverse.segments[1][2][3] == 6, "reverse Visual selection retains its normalized byte range")
 
 vim.o.selection = "exclusive"
 vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "abcdef", "second", "third" })

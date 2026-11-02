@@ -46,6 +46,39 @@ function M.setup(states, group)
       return false
     end,
   })
+  vim.api.nvim_create_autocmd("WinEnter", {
+    group = group,
+    callback = function()
+      local current = vim.api.nvim_get_current_win()
+      for win, state in pairs(states) do
+        if win ~= current and state.selection then
+          state.selection.active = false
+        end
+      end
+      vim.cmd.redraw()
+    end,
+  })
+  vim.api.nvim_create_autocmd("WinLeave", {
+    group = group,
+    callback = function()
+      local win = vim.api.nvim_get_current_win()
+      local state = states[win]
+      if not state then return end
+      local mode = vim.api.nvim_get_mode().mode
+      if mode:match("^[vV\\22]") then
+        local selection = capture(win, vim.api.nvim_win_get_buf(win))
+        if selection then
+          selection.active = false
+          state.selection = selection
+        end
+        vim.schedule(function()
+          if vim.api.nvim_get_mode().mode:match("^[vV\\22]") then
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
+          end
+        end)
+      end
+    end,
+  })
   vim.api.nvim_create_autocmd("ModeChanged", {
     group = group,
     callback = function()

@@ -117,6 +117,14 @@ local function find_nearest(sList, eList, curPos)
   end
   local dist_prev = math.abs(curPos[1] - sList[prev_idx][1])
   local dist_next = math.abs(sList[next_idx][1] - curPos[1])
+  if dist_prev == 0 and dist_next == 0 then
+    local col_prev = math.abs(curPos[2] - eList[prev_idx][2])
+    local col_next = math.abs(sList[next_idx][2] - curPos[2])
+    if col_next < col_prev then
+      return next_idx, 1
+    end
+    return prev_idx, -1
+  end
   if dist_next < dist_prev then
     return next_idx, 1
   end
@@ -124,6 +132,10 @@ local function find_nearest(sList, eList, curPos)
 end
 
 local function format_lens_chunks(idx, cnt, relIdx, nearest)
+  if nearest then
+    local text = string.format("[%d/%d]", idx, cnt)
+    return { { " " }, { text, "HlSearchLensNear" } }, #text + 1
+  end
   local sfw = vim.v.searchforward == 1
   local indicator = ""
   local absRelIdx = math.abs(relIdx)
@@ -132,13 +144,29 @@ local function format_lens_chunks(idx, cnt, relIdx, nearest)
   elseif absRelIdx == 1 then
     indicator = sfw ~= (relIdx == 1) and "N" or "n"
   end
-  if nearest then
-    local text = indicator ~= "" and string.format("[%s %d/%d]", indicator, idx, cnt) or string.format("[%d/%d]", idx, cnt)
-    return { { " " }, { text, "HlSearchLensNear" } }
+  local text = string.format("[%s %d]", indicator, idx)
+  return { { " " }, { text, "HlSearchLens" } }, #text + 1
+end
+
+local function apply_lens_extmark(win, buf, ns, lnum, chunks, lens_width, priority)
+  local ok_info, infos = pcall(vim.fn.getwininfo, win)
+  local info = ok_info and infos and infos[1] or nil
+  local text_width = info and math.max(1, (info.width or 80) - (info.textoff or 0)) or vim.api.nvim_win_get_width(win)
+  local line = vim.api.nvim_buf_get_lines(buf, lnum - 1, lnum, false)[1] or ""
+  local line_width = vim.fn.strdisplaywidth(line)
+  local opts = {
+    virt_text = chunks,
+    hl_mode = "combine",
+    priority = priority,
+    ephemeral = true,
+    strict = false,
+  }
+  if line_width + lens_width + 1 <= text_width then
+    opts.virt_text_pos = "eol"
   else
-    local text = string.format("[%s %d]", indicator, idx)
-    return { { " " }, { text, "HlSearchLens" } }
+    opts.virt_text_win_col = math.max(0, text_width - lens_width - 1)
   end
+  vim.api.nvim_buf_set_extmark(buf, ns, lnum - 1, 0, opts)
 end
 
 local function active_pattern(state)
@@ -179,56 +207,46 @@ local function render_window_lens(ns, win, buf, topRow, botRow, state)
   end
 
   local idxLnum = nearStart[1]
-  local lineRenderList = {}
-  local tIdx = idx - 1 - math.min(relIdx, 0)
-  local lastHlLnum = 0
-  for i = math.max(tIdx, 0), 1, -1 do
-    local iLnum = sList[i][1]
-    if iLnum < topLimit then break end
-    if lastHlLnum ~= iLnum then
-      lastHlLnum = iLnum
-      lineRenderList[iLnum] = { i, i - tIdx - 1 }
-    end
-  end
-
-  local bIdx = idx + 1 - math.max(relIdx, 0)
-  lastHlLnum = idxLnum
-  local lastI, lastLnum
-  for i = bIdx, cnt do
-    lastI = i
-    lastLnum = sList[i][1]
-    if lastHlLnum ~= lastLnum then
-      lastHlLnum = lastLnum
-      lineRenderList[sList[i - 1][1]] = { i - 1, i - bIdx }
-    end
-    if lastLnum > botLimit then break end
-  end
-  if lastI and lastLnum and lastLnum <= botLimit then
-    lineRenderList[lastLnum] = { lastI, lastI - bIdx + 1 }
-  end
-  lineRenderList[idxLnum] = nil
-
   if idxLnum >= topLimit and idxLnum <= botLimit then
-    vim.api.nvim_buf_set_extmark(buf, ns, idxLnum - 1, 0, {
-      virt_text = format_lens_chunks(idx, cnt, relIdx, true),
-      virt_text_pos = "eol",
-      hl_mode = "combine",
-      priority = 100,
-      ephemeral = true,
-      strict = false,
-    })
+    local chunks, lens_w = format_lens_chunks(idx, cnt, relIdx, true)
+    apply_lens_extmark(win, buf, ns, idxLnum, chunks, lens_w, 100)
   end
 
-  for lnum, pair in pairs(lineRenderList) do
-    if lnum >= topLimit and lnum <= botLimit then
-      vim.api.nvim_buf_set_extmark(buf, ns, lnum - 1, 0, {
-        virt_text = format_lens_chunks(pair[1], cnt, pair[2], false),
-        virt_text_pos = "eol",
-        hl_mode = "combine",
-        priority = 90,
-        ephemeral = true,
-        strict = false,
-      })
+  if vim.g.viewsplit_hlslens_nearest_only == false then
+    local lineRenderList = {}
+    local tIdx = idx - 1 - math.min(relIdx, 0)
+    local lastHlLnum = 0
+    for i = math.max(tIdx, 0), 1, -1 do
+      local iLnum = sList[i][1]
+      if iLnum < topLimit then break end
+      if lastHlLnum ~= iLnum then
+        lastHlLnum = iLnum
+        lineRenderList[iLnum] = { i, i - tIdx - 1 }
+      end
+    end
+
+    local bIdx = idx + 1 - math.max(relIdx, 0)
+    lastHlLnum = idxLnum
+    local lastI, lastLnum
+    for i = bIdx, cnt do
+      lastI = i
+      lastLnum = sList[i][1]
+      if lastHlLnum ~= lastLnum then
+        lastHlLnum = lastLnum
+        lineRenderList[sList[i - 1][1]] = { i - 1, i - bIdx }
+      end
+      if lastLnum > botLimit then break end
+    end
+    if lastI and lastLnum and lastLnum <= botLimit then
+      lineRenderList[lastLnum] = { lastI, lastI - bIdx + 1 }
+    end
+    lineRenderList[idxLnum] = nil
+
+    for lnum, pair in pairs(lineRenderList) do
+      if lnum >= topLimit and lnum <= botLimit then
+        local chunks, lens_w = format_lens_chunks(pair[1], cnt, pair[2], false)
+        apply_lens_extmark(win, buf, ns, lnum, chunks, lens_w, 90)
+      end
     end
   end
 end
@@ -262,6 +280,7 @@ end
 
 function M.update_prompt(state)
   if not state or not valid(state.winid) then return end
+  pcall(vim.api.nvim__redraw, { win = state.winid, valid = false })
   if vim.api.nvim_get_current_win() ~= state.winid then return end
   local pattern = state.search_pattern
   if pattern and pattern ~= "" then
@@ -442,20 +461,13 @@ function M.setup(states, group)
       end)
     end,
   })
-  vim.api.nvim_create_autocmd("CursorMoved", {
+  vim.api.nvim_create_autocmd({ "CursorMoved", "WinScrolled" }, {
     group = group,
     callback = function()
       local win = vim.api.nvim_get_current_win()
       local state = states[win]
       if not state or not state.search_pattern or state.search_pattern == "" then return end
-      local buf = vim.api.nvim_win_get_buf(win)
-      local sList, eList = get_matches_cached(state, buf, state.search_pattern)
-      if #sList == 0 then return end
-      local cursor = vim.api.nvim_win_get_cursor(win)
-      local idx, relIdx = find_nearest(sList, eList, { cursor[1], cursor[2] + 1 })
-      if not idx then return end
-      local key = string.format("%d:%d:%d", idx, relIdx, vim.v.searchforward)
-      if key ~= state._last_lens_key then
+      if valid(win) then
         pcall(vim.api.nvim__redraw, { win = win, valid = false })
       end
     end,

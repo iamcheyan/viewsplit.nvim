@@ -21,13 +21,13 @@ end
 
 leave_selection(a, "vll<Esc>")
 local sa = viewsplit.selection_state(a)
-assert(sa and sa.first and sa.last and sa.kind == "char", "view A should retain a characterwise selection")
+assert(sa and sa.segments and sa.kind == "char", "view A should retain a characterwise selection")
 
 leave_selection(b, "vllll<Esc>")
 local sb = viewsplit.selection_state(b)
-assert(sb and sb.first and sb.last and sb.kind == "char", "view B should retain its characterwise selection")
-assert(sa.last[2] ~= sb.last[2], "the two view selections should differ")
-assert(viewsplit.selection_state(a).last[2] == sa.last[2], "view A state must survive selecting in B")
+assert(sb and sb.segments and sb.kind == "char", "view B should retain its characterwise selection")
+assert(sa.segments[1][2][3] ~= sb.segments[1][2][3], "the two view selections should differ")
+assert(viewsplit.selection_state(a).segments[1][2][3] == sa.segments[1][2][3], "view A state must survive selecting in B")
 assert(vim.api.nvim_buf_get_lines(buf, 0, -1, true)[1] == "one two three four", "selection capture must not edit text")
 
 print("selection_spec: OK")

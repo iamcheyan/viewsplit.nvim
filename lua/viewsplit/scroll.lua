@@ -1,33 +1,49 @@
 local M = {}
+local api = vim.api
 
-local function valid(win)
-  return type(win) == "number" and vim.api.nvim_win_is_valid(win)
+local function capture(state)
+  if not api.nvim_win_is_valid(state.winid) then return end
+  state.cursor = api.nvim_win_get_cursor(state.winid)
+  local view = api.nvim_win_call(state.winid, vim.fn.winsaveview)
+  state.topline = view.topline
+  state.leftcol = view.leftcol
+  state.skipcol = view.skipcol
+  state.curswant = view.curswant
 end
 
-function M.setup(states, group)
-  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "WinScrolled" }, {
-    group = group,
-    callback = function()
-      local win = vim.api.nvim_get_current_win()
-      local state = states[win]
-      if state then
-        state.cursor = vim.api.nvim_win_get_cursor(win)
-        local view = vim.fn.winsaveview()
-        state.topline = view.topline
-        state.leftcol = view.leftcol
-      end
-    end,
-  })
+function M.capture(state)
+  capture(state)
 end
 
 function M.restore(state)
-  if not valid(state.winid) then return end
-  vim.api.nvim_win_call(state.winid, function()
-    vim.fn.winrestview({ topline = state.topline or 1, leftcol = state.leftcol or 0 })
+  if not api.nvim_win_is_valid(state.winid) then return end
+  api.nvim_win_call(state.winid, function()
+    vim.fn.winrestview({
+      lnum = state.cursor and state.cursor[1] or 1,
+      col = state.cursor and state.cursor[2] or 0,
+      topline = state.topline or 1,
+      leftcol = state.leftcol or 0,
+      skipcol = state.skipcol or 0,
+      curswant = state.curswant or 0,
+    })
   end)
-  if state.cursor and #state.cursor == 2 then
-    pcall(vim.api.nvim_win_set_cursor, state.winid, state.cursor)
-  end
+end
+
+function M.setup(states, group)
+  api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI", "WinScrolled", "WinLeave" }, {
+    group = group,
+    callback = function()
+      local state = states[api.nvim_get_current_win()]
+      if state then capture(state) end
+    end,
+  })
+  api.nvim_create_autocmd("WinEnter", {
+    group = group,
+    callback = function()
+      local state = states[api.nvim_get_current_win()]
+      if state then M.restore(state) end
+    end,
+  })
 end
 
 return M

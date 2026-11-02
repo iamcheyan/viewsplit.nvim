@@ -40,6 +40,14 @@ function M.restore(state)
 end
 
 function M.setup(states, group)
+  local configured_hlslens = package.loaded["hlslens"] ~= nil
+  if configured_hlslens and vim.g.viewsplit_hlslens_incsearch ~= false then
+    local hlslens = package.loaded["hlslens"]
+    if hlslens._config then hlslens._config.enable_incsearch = false end
+    if package.loaded["hlslens.config"] then
+      package.loaded["hlslens.config"].enable_incsearch = false
+    end
+  end
   vim.opt.hlsearch = false
   vim.api.nvim_create_autocmd("CmdlineLeave", {
     group = group,

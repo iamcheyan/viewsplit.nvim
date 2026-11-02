@@ -2,11 +2,17 @@
 
 SETUP                                                   *viewsplit-setup*
 
-    require("viewsplit").setup({ search = true, selection = false })
+    require("viewsplit").setup({
+        search = true,
+        folds = false,
+        jumps = false,
+        scroll = false,
+        selection = false,
+    })
 
-Calling setup() without options enables the implemented per-window search layer.
-Other options remain opt-in. Supported options are `search` and experimental
-`selection`.
+Calling setup() without options enables the per-window search layer. Fold,
+jump-history, scroll-context, and Visual snapshot layers are opt-in. Mark APIs
+are available independently and do not replace Neovim's native marks.
 
 API                                                       *viewsplit-api*
 
@@ -15,26 +21,55 @@ API                                                       *viewsplit-api*
 `require("viewsplit").current_view_id()` returns the focused window ID.
 `require("viewsplit").selection_state(winid)` returns saved selection state.
 
+`set_mark(name, {row, col}, winid)`, `get_mark(name, winid)`, and
+`del_mark(name, winid)` manage independent lowercase named view marks.
+`jump_back(winid)` and `jump_forward(winid)` traverse the opt-in cursor history.
+These APIs do not replace `<C-o>` or `<C-i>`.
+
 `:ViewInfo` displays the current view state. `:ViewSync` reapplies stored local
 search matches.
 
 SEARCH                                                   *viewsplit-search*
 
-Each window stores its own search pattern and uses a window-local match. On
+Each window stores its own `/` or `?` pattern and uses a window-local match. On
 window entry the pattern is restored to the `/` register, so native `n` and `N`
 continue that view's search. Global `hlsearch` is disabled by this layer.
 
+FOLDS                                                   *viewsplit-folds*
+
+When `folds = true`, window-local fold options and closed fold ranges are
+captured on window leave and restored on window entry. Fold methods that
+produce the same ranges in the shared buffer are required in each view.
+
+JUMP HISTORY                                           *viewsplit-jump-history*
+
+When `jumps = true`, cursor positions are recorded per view and can be
+traversed through `jump_back()` and `jump_forward()`. Native `<C-o>` and
+`<C-i>` mappings are left unchanged.
+
+MARKS                                                     *viewsplit-marks*
+
+The mark API stores lowercase one-character names in each view's in-memory
+state. These marks are separate from Neovim's buffer-local and global marks.
+
+SCROLL                                                   *viewsplit-scroll*
+
+When `scroll = true`, cursor position and `winsaveview()` viewport fields are
+saved and restored per window, including topline, left column, skip column, and
+desired cursor column.
+
 SELECTION                                           *viewsplit-selection*
 
-When `selection = true`, characterwise Visual ranges are stored by window and
-inactive sibling views render them through Neovim 0.12's per-window ephemeral
-decoration provider. Native Visual mode remains active only in the focused
-window. Linewise/blockwise, exclusive selection, and edit tracking are not yet
-verified.
+When `selection = true`, Visual ranges are stored by window and inactive sibling
+views render saved ranges through Neovim 0.12's per-window ephemeral decoration
+provider. Native Visual mode remains active only in the focused window. The
+implementation derives characterwise, linewise, and blockwise ranges from
+`getregionpos()`, including `selection=exclusive`. Inactive overlay rendering
+and range tracking across edits require UI integration verification.
 
 LIMITATIONS                                           *viewsplit-limitations*
 
-The full roadmap includes independent fold state, jumplists, marks, cursor
-history, and more complete Visual state. Those stages are not implemented.
-Stored state is in memory and keyed by window ID; it is removed when the window
-closes.
+State is in memory and keyed by window ID; it is removed when the window
+closes. The plugin retains Neovim's shared-buffer model: text and undo history
+remain shared. Compatibility with third-party plugins and WSL-specific behavior
+must be verified in the target environment before being claimed.

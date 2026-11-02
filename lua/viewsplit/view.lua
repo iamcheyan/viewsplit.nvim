@@ -12,31 +12,39 @@ function M.new(win)
     search_match_id = nil,
     folds = {},
     cursor = {},
-    topline = 0,
+    topline = 1,
     leftcol = 0,
+    skipcol = 0,
+    curswant = 0,
     marks = {},
     jumplist = {},
-    selection = {},
+    selection = nil,
   }
 end
 
 function M.capture(state)
-  if not valid_win(state.winid) then return end
+  if not state or not valid_win(state.winid) then return end
   local win = state.winid
   state.cursor = api.nvim_win_get_cursor(win)
-  local view = vim.fn.winsaveview()
+  local view = api.nvim_win_call(win, vim.fn.winsaveview)
   state.topline = view.topline
   state.leftcol = view.leftcol
+  state.skipcol = view.skipcol
+  state.curswant = view.curswant
 end
 
 function M.restore(state)
-  if not valid_win(state.winid) then return end
+  if not state or not valid_win(state.winid) then return end
   local win = state.winid
-  if state.cursor and #state.cursor == 2 then
-    pcall(api.nvim_win_set_cursor, win, state.cursor)
-  end
-  pcall(api.nvim_win_call, win, function()
-    vim.fn.winrestview({ topline = state.topline or 1, leftcol = state.leftcol or 0 })
+  api.nvim_win_call(win, function()
+    vim.fn.winrestview({
+      lnum = state.cursor and state.cursor[1] or 1,
+      col = state.cursor and state.cursor[2] or 0,
+      topline = state.topline or 1,
+      leftcol = state.leftcol or 0,
+      skipcol = state.skipcol or 0,
+      curswant = state.curswant or 0,
+    })
   end)
 end
 

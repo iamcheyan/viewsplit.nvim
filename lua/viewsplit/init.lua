@@ -3,9 +3,13 @@ local api = vim.api
 local View = require("viewsplit.view")
 local Search = require("viewsplit.search")
 local Selection = require("viewsplit.selection")
+local Folds = require("viewsplit.folds")
+local Jumps = require("viewsplit.jumps")
+local Marks = require("viewsplit.marks")
+local Scroll = require("viewsplit.scroll")
 
 M._state = {}
-M._options = { search = true, folds = false, jumps = false, marks = false, selection = false }
+M._options = { search = true, folds = false, jumps = false, marks = false, selection = false, scroll = false }
 
 local function ensure(win)
   if not api.nvim_win_is_valid(win) then return nil end
@@ -32,6 +36,26 @@ end
 function M.selection_state(win)
   local state = M.view(win)
   return state and state.selection or nil
+end
+
+function M.set_mark(name, pos, win)
+  return Marks.set(M.view(win), name, pos)
+end
+
+function M.get_mark(name, win)
+  return Marks.get(M.view(win), name)
+end
+
+function M.del_mark(name, win)
+  return Marks.delete(M.view(win), name)
+end
+
+function M.jump_back(win)
+  return Jumps.back(M.view(win))
+end
+
+function M.jump_forward(win)
+  return Jumps.forward(M.view(win))
 end
 
 function M.sync()
@@ -61,6 +85,9 @@ function M.setup(opts)
 
   if M._options.search then Search.setup(M._state, group) end
   if M._options.selection then Selection.setup(M._state, group) end
+  if M._options.folds then Folds.setup(M._state, group) end
+  if M._options.jumps then Jumps.setup(M._state, group) end
+  if M._options.scroll then Scroll.setup(M._state, group) end
   api.nvim_create_autocmd("WinNew", {
     group = group,
     callback = function()
@@ -83,7 +110,11 @@ function M.setup(opts)
   })
   api.nvim_create_autocmd("WinEnter", {
     group = group,
-    callback = function() View.restore(M.current_view()) end,
+    callback = function()
+      local state = M.current_view()
+      View.restore(state)
+      if M._options.folds then Folds.restore(state) end
+    end,
   })
 
   api.nvim_create_user_command("ViewSync", M.sync, {})

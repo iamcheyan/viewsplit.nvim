@@ -1,11 +1,19 @@
 local M = {}
 
-local function capture(win, buf)
+local function capture(win, buf, active_mode)
   return vim.api.nvim_win_call(win, function()
-    local first = vim.api.nvim_buf_get_mark(buf, "<")
-    local last = vim.api.nvim_buf_get_mark(buf, ">")
-    if first[1] < 1 or last[1] < 1 then return nil end
-    local mode = vim.fn.visualmode()
+    local mode = active_mode or vim.fn.visualmode()
+    local first, last
+    if active_mode then
+      local anchor = vim.fn.getpos("v")
+      local cursor = vim.fn.getcurpos()
+      first = { anchor[2], anchor[3] - 1 }
+      last = { cursor[2], cursor[3] - 1 }
+    else
+      first = vim.api.nvim_buf_get_mark(buf, "<")
+      last = vim.api.nvim_buf_get_mark(buf, ">")
+      if first[1] < 1 or last[1] < 1 then return nil end
+    end
     local exclusive = vim.o.selection == "exclusive"
     local p1 = { buf, first[1], first[2] + 1, 0 }
     local p2 = { buf, last[1], last[2] + 1, 0 }
@@ -66,7 +74,7 @@ function M.setup(states, group)
       if not state then return end
       local mode = vim.api.nvim_get_mode().mode
       if mode:match("^[vV\\22]") then
-        local selection = capture(win, vim.api.nvim_win_get_buf(win))
+        local selection = capture(win, vim.api.nvim_win_get_buf(win), mode)
         if selection then
           selection.active = false
           state.selection = selection

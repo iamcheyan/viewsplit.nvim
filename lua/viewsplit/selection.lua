@@ -1,5 +1,18 @@
 local M = {}
 
+local function configure_window(ns, win, active)
+  if not vim.api.nvim_win_is_valid(win) then return end
+  if active then
+    vim.api.nvim_win_set_hl_ns(win, 0)
+    return
+  end
+  local normal = vim.api.nvim_get_hl(0, { name = "Normal", link = false })
+  local visual = vim.api.nvim_get_hl(0, { name = "Visual", link = false })
+  vim.api.nvim_set_hl(ns, "Visual", { link = "Normal" })
+  vim.api.nvim_set_hl(ns, "ViewSplitSavedSelection", visual)
+  vim.api.nvim_win_set_hl_ns(win, ns)
+end
+
 local function capture(win, buf, active_mode)
   return vim.api.nvim_win_call(win, function()
     local mode = active_mode or vim.fn.visualmode()
@@ -34,7 +47,7 @@ local function render(ns, win, buf, selection)
       vim.api.nvim_buf_set_extmark(buf, ns, first[2] - 1, first[3] - 1, {
         end_row = last[2] - 1,
         end_col = last[3] - 1,
-        hl_group = "Visual",
+        hl_group = "ViewSplitSavedSelection",
         priority = 200,
         ephemeral = true,
         strict = false,
@@ -49,8 +62,11 @@ function M.setup(states, group)
     on_win = function(_, win, buf)
       local state = states[win]
       if not state or vim.api.nvim_win_get_buf(win) ~= buf then return false end
-      render(ns, win, buf, state.selection)
-      if win == vim.api.nvim_get_current_win() then return end
+      local active = win == vim.api.nvim_get_current_win()
+      configure_window(ns, win, active)
+      if not active then
+        render(ns, win, buf, state.selection)
+      end
       return false
     end,
   })
@@ -62,6 +78,7 @@ function M.setup(states, group)
         if win ~= current and state.selection then
           state.selection.active = false
         end
+        configure_window(ns, win, win == current)
       end
       vim.cmd.redraw()
     end,
